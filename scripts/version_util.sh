@@ -261,6 +261,7 @@ function create_hotfix() {
   patch=$(run_cmd /showvariable Patch)
   targetVersion="${major}.${minor}.$(( $patch + 1 ))"
   targetVersion=${TARGET_VERSION:-$targetVersion}
+  ensure_target_version_gt_branch_version $targetVersion $GF_MASTER
   create_branch "$GF_MASTER" "hotfix-${targetVersion}" hotfix-
 }
 
@@ -285,10 +286,10 @@ function ensure_target_version_gt_branch_version() {
   test_semver $targetVersion
   checkout_branch $branch -q
   branchVersion=$(run_cmd /showvariable FullSemVer)
-  version_gt $branchVersion $targetVersion || die "Branch version is lower than target version:
-  $branchVersion <- $branch
+  version_gt $targetVersion $branchVersion || die "Branch version to be created is lower than the version on '$branch':
+  $branchVersion <- branch ($branch)
   vs
-  $targetVersion
+  $targetVersion <- target
   "
 }
 
@@ -301,9 +302,9 @@ function ensure_source_version_gt_target_version() {
   checkout_branch $target -q
   targetVersion=$(run_cmd /showvariable FullSemVer)
   version_gt $sourceVersion $targetVersion || die "Source branch version is lower than target branch version:
-  $sourceVersion <- $source
+  $sourceVersion <- source ($source)
   vs
-  $targetVersion <- $target
+  $targetVersion <- target ($target)
   "
 }
 
