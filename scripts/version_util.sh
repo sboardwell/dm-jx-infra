@@ -7,7 +7,7 @@ function die() { echo "$@" 1>&2 ; exit 1; }
 function dieGracefully() { echo "$@" 1>&2 ; exit 0; }
 
 function test_semver() {
-  [[ $1 =~ ^${2}[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3} ]] || die "Value '$1' does not match ${2}x.x.x."
+  [[ $1 =~ ^${2:-}[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3} ]] || die "Value '$1' does not match ${2:-}x.x.x."
 }
 
 function release_semver() {
@@ -154,6 +154,7 @@ function rename_hotfix() {
   targetBranch=$(readValue "New hotfix branch [$targetBranch]: ")
   [[ "$workingBr" != "$targetBranch" ]] || die "source and target cannot be identical"
   hotfix_semver "$targetBranch"
+  ensure_target_version_gt_branch_version $targetVersion $GF_MASTER
   rename_branch "$workingBr" "$targetBranch"
 }
 
@@ -164,6 +165,7 @@ function rename_release() {
   targetBranch=$(readValue "New release branch [$targetBranch]: ")
   [[ "$workingBr" != "$targetBranch" ]] || die "source and target cannot be identical"
   release_semver "$targetBranch"
+  ensure_target_version_gt_branch_version $targetVersion $GF_MASTER
   rename_branch "$workingBr" "$targetBranch"
 }
 
@@ -239,11 +241,13 @@ function delete_branch() {
 
 function create_release() {
   local targetVersion
+  ensure_single_branch "$GF_MASTER"
   ensure_single_branch "$GF_DEVELOP"
   ensure_no_branch "$GF_RELEASE_PATTERN"
   checkout_branch "$GF_DEVELOP" '-q'
   targetVersion=$(run_cmd /showvariable MajorMinorPatch)
   targetVersion=${TARGET_VERSION:-$targetVersion}
+  ensure_target_version_gt_branch_version $targetVersion $GF_MASTER
   create_branch "$GF_DEVELOP" "release-${targetVersion}" release-
 }
 
@@ -274,6 +278,20 @@ function merge_release() {
   tag_branch "$GF_MASTER"
 }
 
+function ensure_target_version_gt_branch_version() {
+  local targetVersion=$1
+  local branch=$2
+  local branchVersion
+  test_semver $targetVersion
+  checkout_branch $branch -q
+  branchVersion=$(run_cmd /showvariable FullSemVer)
+  version_gt $branchVersion $targetVersion || die "Branch version is lower than target version:
+  $branchVersion <- $branch
+  vs
+  $targetVersion
+  "
+}
+
 function ensure_source_version_gt_target_version() {
   local source=$1
   local target=$2
@@ -284,6 +302,7 @@ function ensure_source_version_gt_target_version() {
   targetVersion=$(run_cmd /showvariable FullSemVer)
   version_gt $sourceVersion $targetVersion || die "Source branch version is lower than target branch version:
   $sourceVersion <- $source
+  vs
   $targetVersion <- $target
   "
 }
