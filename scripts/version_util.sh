@@ -146,7 +146,8 @@ function rename_branch() {
 function rename_hotfix() {
   local workingBr targetBranch
   workingBr=$(ensure_single_branch "$GF_HOTFIX_PATTERN" true)
-  targetBranch=$(readValue "New hotfix branch [$workingBr]: ")
+  [ -n "${TARGET_VERSION:-}" ] && targetBranch="hotfix-$TARGET_VERSION" || targetBranch="$workingBr"
+  targetBranch=$(readValue "New hotfix branch [$targetBranch]: ")
   [[ "$workingBr" != "$targetBranch" ]] || die "source and target cannot be identical"
   hotfix_semver "$targetBranch"
   rename_branch "$workingBr" "$targetBranch"
@@ -155,7 +156,8 @@ function rename_hotfix() {
 function rename_release() {
   local workingBr targetBranch
   workingBr=$(ensure_single_branch "$GF_RELEASE_PATTERN" true)
-  targetBranch=$(readValue "New release branch [$workingBr]: ")
+  [ -n "${TARGET_VERSION:-}" ] && targetBranch="release-$TARGET_VERSION" || targetBranch="$workingBr"
+  targetBranch=$(readValue "New release branch [$targetBranch]: ")
   [[ "$workingBr" != "$targetBranch" ]] || die "source and target cannot be identical"
   release_semver "$targetBranch"
   rename_branch "$workingBr" "$targetBranch"
@@ -237,6 +239,7 @@ function create_release() {
   ensure_no_branch "$GF_RELEASE_PATTERN"
   checkout_branch "$GF_DEVELOP" '-q'
   targetVersion=$(run_cmd /showvariable MajorMinorPatch)
+  targetVersion=${TARGET_VERSION:-$targetVersion}
   create_branch "$GF_DEVELOP" "release-${targetVersion}" release-
 }
 
@@ -249,6 +252,7 @@ function create_hotfix() {
   minor=$(run_cmd /showvariable Minor)
   patch=$(run_cmd /showvariable Patch)
   targetVersion="${major}.${minor}.$(( $patch + 1 ))"
+  targetVersion=${TARGET_VERSION:-$targetVersion}
   create_branch "$GF_MASTER" "hotfix-${targetVersion}" hotfix-
 }
 
