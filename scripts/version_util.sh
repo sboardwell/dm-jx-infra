@@ -286,7 +286,7 @@ function ensure_target_version_gt_branch_version() {
   test_semver $targetVersion
   checkout_branch $branch -q
   branchVersion=$(run_cmd /showvariable FullSemVer)
-  version_gt $targetVersion $branchVersion || die "Branch version to be created is lower than the version on '$branch':
+  version_gt $targetVersion $branchVersion || die "Target version supplied is lower than the version on '$branch':
   $branchVersion <- branch ($branch)
   vs
   $targetVersion <- target
@@ -341,13 +341,15 @@ function merge_hotfix() {
 
 function tag_branch() {
   local workingBr=$1
-  local tag tagInput
+  local tag tagInput tagVersion
   workingBr=$(ensure_single_branch "$workingBr" true)
   checkout_branch $workingBr
-  tag="v$(run_cmd /showvariable SemVer)"
+  tagVersion="$(run_cmd /showvariable SemVer)"
+  tag="v${TARGET_VERSION:-$tagVersion}"
   tagInput=$(readValue "New tag [$tag]: ")
   tag=${tagInput:-$tag}
   test_semver "$tag" v
+  ensure_target_version_gt_branch_version $tagVersion $workingBr
   confirm "Will tag branch '$workingBr' with '$tag'"
   gitCmd tag -am "Add tag '$tag' (performed by $USER)" $tag
   gitCmd push origin $tag
