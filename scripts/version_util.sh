@@ -18,6 +18,10 @@ function hotfix_semver() {
   test_semver "$1" hotfix-
 }
 
+function version_gt() {
+  test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
+}
+
 function confirm () {
     local msg="${1:-Are you sure?} [Y/n]"
     # call with a prompt string or use a default
@@ -261,11 +265,27 @@ function merge_release() {
   masterBr=$(ensure_single_branch "$GF_MASTER" true)
   developBr=$(ensure_single_branch "$GF_DEVELOP" true)
   workingBr=$(ensure_single_branch "$GF_RELEASE_PATTERN" true)
+  # release version has to be greater than master
+  ensure_source_version_gt_target_version $workingBr $masterBr
   merge_source_into_target $workingBr $developBr
   merge_source_into_target $workingBr $masterBr
   merge_source_into_target $masterBr $developBr
   delete_branch $workingBr
   tag_branch "$GF_MASTER"
+}
+
+function ensure_source_version_gt_target_version() {
+  local source=$1
+  local target=$2
+  local sourceVersion targetVersion
+  checkout_branch $source -q
+  sourceVersion=$(run_cmd /showvariable FullSemVer)
+  checkout_branch $target -q
+  targetVersion=$(run_cmd /showvariable FullSemVer)
+  version_gt $sourceVersion $targetVersion || die "Source branch version is lower than target branch version:
+  $sourceVersion <- $source
+  $targetVersion <- $target
+  "
 }
 
 function status() {
@@ -287,6 +307,8 @@ function merge_hotfix() {
   developBr=$(ensure_single_branch "$GF_DEVELOP" true)
   workingBr=$(ensure_single_branch "$GF_HOTFIX_PATTERN" true)
   releaseBr=$(search_for_branch "$GF_RELEASE_PATTERN" true)
+  # hotfix version has to be greater than master
+  ensure_source_version_gt_target_version $hotfixBr $masterBr
   if [ -n "$releaseBr" ]; then
     merge_source_into_target $workingBr $releaseBr
   fi
