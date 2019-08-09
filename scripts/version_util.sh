@@ -362,7 +362,7 @@ function tag_branch() {
   tagInput=$(readValue "New tag [$tag]: ")
   tag=${tagInput:-$tag}
   test_semver "$tag" v
-  ensure_target_version_gt_branch_version $tagVersion $workingBr
+  ensure_target_version_gt_branch_version $tag $workingBr
   confirm "Will tag branch '$workingBr' with '$tag'"
   gitCmd tag -am "Add tag '$tag' (performed by $USER)" $tag
   gitCmd push origin $tag
