@@ -171,7 +171,7 @@ function rename_release() {
 
 function gitCmd() {
   if (( $DRY_RUN )); then
-    echo "DRY_RUN: git $@"
+    echo "[DRY_RUN] git $@"
   else
     git "$@"
   fi
@@ -187,11 +187,38 @@ function readValue() {
   echo -n "${returnVal:-}"
 }
 
+function determine_branch_or_tag_point() {
+  local targetBranch=$1
+  local branchOrTagPointInput latestKnownTagOnBranch
+  # check for custom sha from TARGET_SHA
+  if [ -n "${TARGET_SHA}" ]; then
+    echo "TARGET_SHA found. Replacing default branch/tag point."
+    branchOrTagPoint=$(git rev-parse --short "$TARGET_SHA")
+  else
+    branchOrTagPoint=$(git rev-parse --short HEAD)
+  fi
+  # check for custom sha from user input
+  if [[ "$targetBranch" =~ release* ]]; then
+    echo "Listing last 10 commits."
+    git --no-pager log --oneline -n 10
+    branchOrTagPointInput=$(readValue "Commit to branch from [$branchOrTagPoint]: ")
+    branchOrTagPoint=${branchOrTagPointInput:-$branchOrTagPoint}
+  fi
+  # finally ensure the sha is after the latest tag (if the branch has a tag)
+  if git describe --abbrev=0 --tags &> /dev/null; then
+    latestKnownTagOnBranch=$(git describe --abbrev=0 --tags)
+    git merge-base --is-ancestor $latestKnownTagOnBranch $branchOrTagPoint \
+      die "Something strange going on: branch/tag point '$branchOrTagPoint' is older than the latest known tag '$latestKnownTagOnBranch'."
+  else
+    echo "No tags found on this branch so far. Continuing..."
+  fi
+}
+
 function create_branch() {
   local sourceBranch=$1
   local targetBranch=$2
   local regexPrefix=$3
-  local sourceBranchInput targetBranchInput branchPointInput branchPoint
+  local sourceBranchInput targetBranchInput branchOrTagPoint
 
   # get input vars
   sourceBranchInput=$(readValue "Source branch [$sourceBranch]: ")
@@ -200,25 +227,10 @@ function create_branch() {
   targetBranch=${targetBranchInput:-$targetBranch}
   test_semver "$targetBranch" $regexPrefix
   confirm "Create branch '$targetBranch' from source '$sourceBranch'"
-  # check for custom commit
   checkout_branch $sourceBranch
-  branchPoint=$(git rev-parse --short HEAD)
-  if [[ "$targetBranch" =~ release* ]]; then
-    echo "Listing last 10 commits."
-    git --no-pager log --oneline -n 10
-    branchPointInput=$(readValue "Commit to branch from [$branchPoint]: ")
-    branchPointInput=${branchPointInput:-$branchPoint}
-    if [[ "${branchPointInput:-}" != "$branchPoint" ]]; then
-      echo "Checking out from commit '$branchPointInput'"
-      gitCmd checkout -b $targetBranch $branchPointInput
-    else
-      echo "Checking out from HEAD"
-      gitCmd checkout -b $targetBranch
-    fi
-  else
-    echo "Checking out from HEAD"
-    gitCmd checkout -b $targetBranch
-  fi
+  determine_branch_or_tag_point $sourceBranch
+  echo "Checking out from commit '$branchOrTagPoint'"
+  gitCmd checkout -b $targetBranch $branchOrTagPoint
   gitCmd push --set-upstream origin $targetBranch
 }
 
@@ -344,6 +356,7 @@ function tag_branch() {
   local tag tagInput tagVersion
   workingBr=$(ensure_single_branch "$workingBr" true)
   checkout_branch $workingBr
+  determine_branch_or_tag_point $workingBr
   tagVersion="$(run_cmd /showvariable SemVer)"
   tag="v${TARGET_VERSION:-$tagVersion}"
   tagInput=$(readValue "New tag [$tag]: ")
@@ -384,6 +397,8 @@ GF_RELEASE_PATTERN='release-*'
 GF_HOTFIX_PATTERN='hotfix-*'
 BATCH_MODE=${BATCH_MODE:-0}
 DRY_RUN=${DRY_RUN:-0}
+TARGET_VERSION=${TARGET_VERSION:-}
+TARGET_SHA=${TARGET_SHA:-}
 
 
 if [[ $ARG == 'prereqs' ]]; then
