@@ -208,7 +208,7 @@ function determine_branch_or_tag_point() {
   if git describe --abbrev=0 --tags &> /dev/null; then
     latestKnownTagOnBranch=$(git describe --abbrev=0 --tags)
     git merge-base --is-ancestor $latestKnownTagOnBranch $branchOrTagPoint \
-      die "Something strange going on: branch/tag point '$branchOrTagPoint' is older than the latest known tag '$latestKnownTagOnBranch'."
+      || die "Something strange going on: branch/tag point '$branchOrTagPoint' is older than the latest known tag '$latestKnownTagOnBranch'."
   else
     echo "No tags found on this branch so far. Continuing..."
   fi
