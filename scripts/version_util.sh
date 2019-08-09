@@ -399,6 +399,9 @@ BATCH_MODE=${BATCH_MODE:-0}
 DRY_RUN=${DRY_RUN:-0}
 TARGET_VERSION=${TARGET_VERSION:-}
 TARGET_SHA=${TARGET_SHA:-}
+DEBUG=${DEBUG:-0}
+(( $DEBUG )) && { echo "DEBUG activated. Using 'set -x'..."; set -x; }
+
 
 
 if [[ $ARG == 'prereqs' ]]; then
