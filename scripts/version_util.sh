@@ -336,20 +336,16 @@ function create_pull_request() {
   hubCmd pull-request -b "${baseBranch}" -h "${headBranch}" -m "${msg}"
 }
 
-function release_close() {
-  local developBr workingBr
+function all_close() {
+  local developBr workingBr branchPattern=$1
   developBr=$(ensure_single_branch "$GF_DEVELOP" true)
-  workingBr=$(ensure_single_branch "$GF_RELEASE_PATTERN" true)
+  workingBr=$(ensure_single_branch "$branchPattern" true)
+  gitCmd fetch origin $developBr
+  checkout_branch $workingBr -q
+  gitCmd merge origin/$developBr
+  gitCmd push
   create_pull_request $developBr $workingBr
 }
-
-function hotfix_close() {
-  local developBr workingBr
-  developBr=$(ensure_single_branch "$GF_DEVELOP" true)
-  workingBr=$(ensure_single_branch "$GF_HOTFIX_PATTERN" true)
-  create_pull_request $developBr $workingBr
-}
-
 
 function ensure_target_version_gt_branch_version() {
   local targetVersion=$1
@@ -413,6 +409,15 @@ function develop_tag() {
   tag_branch "$GF_DEVELOP"
 }
 
+function set_final_target_version() {
+  local versionStr workingBr=$1
+  [ -z "${TARGET_VERSION:-}" ] || die "TARGET_VERSION is not allowed to be set manually when finalizing."
+  workingBr=$(ensure_single_branch "$workingBr" true)
+  versionStr=$(echo "${workingBr}" | cut -d '-' -f 2)
+  test_semver "${versionStr}"
+  TARGET_VERSION="${versionStr}"
+}
+
 function empty_commit() {
   local currentBr dateStr
   currentBr=$(git symbolic-ref --short HEAD)
@@ -436,7 +441,6 @@ trap finish EXIT
 ARG=${1:-}; shift || true
 
 # some default vars - need to change them for europa.
-DEFAULT_PR_REVIEWERS=sboardwell,sbuechner
 GF_DEVELOP='develop'
 GF_RELEASE_PATTERN='release-*'
 GF_HOTFIX_PATTERN='hotfix-*'
@@ -464,30 +468,41 @@ elif [[ $ARG == 'run' ]]; then
   run_cmd "$@"
 elif [[ $ARG == 'f' ]]; then
   get_field ${1:-}
-elif [[ $ARG == 'release_create' ]]; then
-  ensure_pristine_workspace
-  release_create "$@"
-elif [[ $ARG == 'release_rename' ]]; then
-  ensure_pristine_workspace
-  release_rename "$@"
-elif [[ $ARG == 'hotfix_rename' ]]; then
-  ensure_pristine_workspace
-  hotfix_rename "$@"
 elif [[ $ARG == 'develop_tag' ]]; then
   ensure_pristine_workspace
   develop_tag "$@"
+elif [[ $ARG == 'release_create' ]]; then
+  ensure_pristine_workspace
+  release_create "$@"
 elif [[ $ARG == 'release_tag' ]]; then
   ensure_pristine_workspace
   tag_branch "$GF_RELEASE_PATTERN" "$@"
+elif [[ $ARG == 'release_finalise' ]]; then
+  ensure_pristine_workspace
+  set_final_target_version "$GF_RELEASE_PATTERN"
+  tag_branch "$GF_RELEASE_PATTERN" "$@"
+elif [[ $ARG == 'release_close' ]]; then
+  ensure_pristine_workspace
+  all_close "${GF_RELEASE_PATTERN}"
+elif [[ $ARG == 'release_rename' ]]; then
+  ensure_pristine_workspace
+  release_rename "$@"
 elif [[ $ARG == 'hotfix_create' ]]; then
   ensure_pristine_workspace
   hotfix_create "$@"
-elif [[ $ARG == 'release_close' ]]; then
+elif [[ $ARG == 'hotfix_tag' ]]; then
   ensure_pristine_workspace
-  release_close "$@"
+  tag_branch "$GF_HOTFIX_PATTERN" "$@"
+elif [[ $ARG == 'hotfix_finalise' ]]; then
+  ensure_pristine_workspace
+  set_final_target_version "$GF_HOTFIX_PATTERN"
+  tag_branch "$GF_HOTFIX_PATTERN" "$@"
 elif [[ $ARG == 'hotfix_close' ]]; then
   ensure_pristine_workspace
-  hotfix_close "$@"
+  all_close "${GF_HOTFIX_PATTERN}"
+elif [[ $ARG == 'hotfix_rename' ]]; then
+  ensure_pristine_workspace
+  hotfix_rename "$@"
 elif [[ $ARG == 'status' ]]; then
   ensure_pristine_workspace
   status "$@"
