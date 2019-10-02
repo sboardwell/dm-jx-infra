@@ -63,7 +63,7 @@ Uncheck this parameter to run commands without manual confirmation (to be used a
         }
         stage('Verify') {
             when {
-                expression { ! params.MANUAL_CONFIRMATION }
+                expression { params.MANUAL_CONFIRMATION }
             }
             steps {
                 input """
