@@ -390,7 +390,7 @@ function exact_tag_exists() {
     tagCommit=$(git rev-list -n 1 "$tag")
     targetSha=$(git rev-parse "$branchOrTagPoint")
     if [[ "$tagCommit" == "$targetSha" ]]; then
-      return true
+      return 0
     else
       die "Tag '$tag' exists and points to a different commit:
       current tag sha = $tagCommit
@@ -398,7 +398,7 @@ function exact_tag_exists() {
       "
     fi
   fi
-  return false
+  return 1
 }
 
 function tag_branch() {
@@ -502,8 +502,6 @@ elif [[ $ARG == 'release_tag' ]]; then
   tag_branch "$GF_RELEASE_PATTERN" "$@"
 elif [[ $ARG == 'release_finalise' ]]; then
   ensure_pristine_workspace
-  echo "*** Tagging develop so that we keep the current bumped version."
-  tag_branch "$GF_DEVELOP" "$@"
   set_final_target_version "$GF_RELEASE_PATTERN"
   tag_branch "$GF_RELEASE_PATTERN" "$@"
 elif [[ $ARG == 'release_close' ]]; then
